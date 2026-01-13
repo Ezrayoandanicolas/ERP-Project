@@ -1,0 +1,435 @@
+<?php
+
+namespace App\Filament\Pos;
+
+use Filament\Pages\Page;
+use App\Models\Product;
+use App\Models\ProductVariant;
+use App\Models\Sale;
+use App\Models\SaleItem;
+use App\Models\Stock;
+use App\Services\StockService;
+use Filament\Notifications\Notification;
+use Illuminate\Support\Arr;
+use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Auth;
+use Carbon\Carbon;
+
+abstract class BasePosSale extends Page
+{
+    // STATE
+    public ?int $store_id = null;
+    public ?int $outlet_id = null;
+    public ?string $customer_name = 'Umum';
+    public string $payment_method = 'cash';
+    public array $cart = [];
+    public int|float $total = 0;
+    public int|float $discount = 0;
+    public ?int $lastSaleId = null;
+    public ?string $sale_date = null;
+    public $category_id = null;
+    public array $items = [];
+
+    abstract protected function setupContext(): void;
+
+    public function mount(): void
+    {
+        $this->setupContext();
+        $this->cart = [];
+        $this->discount = 0;
+        $this->total = 0;
+        $this->sale_date = now()->toDateString();
+    }
+
+    protected function loadItems(): void
+    {
+        if (! $this->store_id || ! $this->outlet_id) {
+            $this->items = [];
+            return;
+        }
+
+        $this->items = [];
+
+        $products = Product::with([
+            'variants' => fn ($q) => $q->where('is_active', true),
+            'stocks'
+        ])
+        ->where('store_id', $this->store_id)
+        ->when($this->category_id, fn ($q) =>
+            $q->where('category_id', $this->category_id)
+        )
+        ->orderBy('name')
+        ->get();
+
+        foreach ($products as $product) {
+            $stocks = $product->stocks->where('outlet_id', $this->outlet_id);
+            $stockReal = $stocks->where('type','in')->sum('qty')
+                        - $stocks->where('type','out')->sum('qty');
+
+            // PRODUCT
+            $this->items[] = [
+                'key'   => 'product-' . $product->id,
+                'type'  => 'product',
+                'id'    => $product->id,
+                'name'  => $product->name,
+                'price' => $product->sell_price,
+                'image' => $product->image_url,
+                'unit'  => $product->yieldUnit?->name ?? 'pcs',
+                'stock' => $stockReal,
+            ];
+
+            // VARIANT
+            foreach ($product->variants as $variant) {
+                $this->items[] = [
+                    'key'   => 'variant-' . $variant->id,
+                    'type'  => 'variant',
+                    'id'    => $variant->id,
+                    'name'  => $variant->name,
+                    'price' => $variant->price,
+                    'pcs'   => $variant->pcs_used,
+                    'image' => $product->image_url,
+                    'stock' => $variant->pcs_used > 0
+                                ? floor($stockReal / $variant->pcs_used)
+                                : 0,
+                ];
+            }
+        }
+    }
+
+    public function addItem(string $type, int $id): void
+    {
+        if (! $this->store_id || ! $this->outlet_id) {
+            Notification::make()
+                ->title('Pilih toko & outlet dulu')
+                ->danger()
+                ->send();
+            return;
+        }
+
+        $type === 'product'
+            ? $this->addToCart($id)
+            : $this->addVariantToCart($id);
+    }
+
+
+
+    /* ===================== CART ===================== */
+
+    public function addToCart(int $productId): void
+    {
+        $product = Product::find($productId);
+        if (! $product) return;
+
+        if (isset($this->cart[$productId])) {
+            $this->cart[$productId]['qty']++;
+            $this->updateSubtotal($productId);
+            return;
+        }
+
+        $price = (int) $product->sell_price;
+
+        $key = 'product-'.$productId;
+
+        if (isset($this->cart[$key])) {
+            $this->cart[$key]['qty']++;
+            $this->updateSubtotal($key);
+            return;
+        }
+
+
+        $this->cart[$key] = [
+            'key'        => $key,
+            'product_id' => $productId,
+            'variant_id' => null,
+            'pcs_used'   => 1,
+            'name'       => $product->name,
+            'unit'       => $product->yieldUnit?->name ?? 'pcs',
+            'unit_id'    => $product->yield_unit_id,
+            'qty'        => 1,
+            'price'      => $price,
+            'subtotal'   => $price,
+            'image' => $product->image_url,
+
+        ];
+
+        $this->calculateTotal();
+    }
+
+    public function addVariantToCart(int $variantId): void
+    {
+        $variant = ProductVariant::with('product.yieldUnit')->find($variantId);
+
+        if (! $variant) {
+            Notification::make()
+                ->title('Variant tidak ditemukan')
+                ->danger()
+                ->send();
+            return;
+        }
+
+        // ✅ CEK APAKAH VARIANT SUDAH ADA DI CART
+        foreach ($this->cart as $index => $item) {
+            if (($item['variant_id'] ?? null) === $variant->id) {
+                $this->cart[$index]['qty']++;
+                $this->cart[$index]['subtotal'] =
+                    $this->cart[$index]['qty'] * $this->cart[$index]['price'];
+
+                $this->calculateTotal();
+                return;
+            }
+        }
+
+        $baseProduct = $variant->product;
+
+        $key = 'variant-'.$variant->id;
+
+        if (isset($this->cart[$key])) {
+            $this->cart[$key]['qty']++;
+            $this->updateSubtotal($key);
+            return;
+        }
+        // ✅ PUSH KE ARRAY NUMERIK (INI KUNCI UTAMA)
+        $this->cart[$key] = [
+            'key'        => $key,
+            'product_id' => $variant->product_id,        // stok fisik
+            'variant_id' => $variant->id,                // 🔥 PENTING
+            'pcs_used'   => $variant->pcs_used ?? 1,
+            'name'       => $variant->name,
+            'unit'       => $baseProduct->yieldUnit->name ?? 'pcs',
+            'unit_id'    => $baseProduct->yield_unit_id,
+            'qty'        => 1,
+            'price'      => (int) $variant->price,
+            'subtotal'   => (int) $variant->price,
+            'image' => $baseProduct->image_url,
+
+        ];
+
+        $this->calculateTotal();
+    }
+
+    public function updateSubtotal(int|string $key): void
+    {
+        if (! isset($this->cart[$key])) {
+            return;
+        }
+
+        $qty   = (int) Arr::get($this->cart, "{$key}.qty", 1);
+        $price = (int) Arr::get($this->cart, "{$key}.price", 0);
+
+        $this->cart[$key]['qty']      = max(1, $qty);
+        $this->cart[$key]['price']    = max(0, $price);
+        $this->cart[$key]['subtotal'] = $this->cart[$key]['qty'] * $this->cart[$key]['price'];
+
+        $this->calculateTotal();
+    }
+
+    public function calculateTotal(): void
+    {
+        $subtotal = collect($this->cart)->sum(fn($i) => ($i['subtotal'] ?? 0));
+        $discount = (int) ($this->discount ?? 0);
+        $this->total = max(0, $subtotal - $discount);
+    }
+
+    public function removeFromCart(int|string $key): void
+    {
+        if (isset($this->cart[$key])) {
+            unset($this->cart[$key]);
+            $this->calculateTotal();
+        }
+    }
+
+    public function updatedStoreId(): void
+    {
+        $this->outlet_id = null;
+        $this->resetCart();
+    }
+
+    public function updatedOutletId(): void
+    {
+        $this->resetCart();
+        $this->loadItems();
+    }
+
+    public function updatedCategoryId(): void
+    {
+        $this->loadItems();
+    }
+
+    protected function resetCart(): void
+    {
+        $this->cart = [];
+        $this->discount = 0;
+        $this->total = 0;
+    }
+
+
+    /* ===================== SAVE ===================== */
+
+    public function save(): void
+    {
+        if (! $this->store_id || ! $this->outlet_id) {
+            Notification::make()->title('Store / outlet tidak valid')->danger()->send();
+            return;
+        }
+
+        if (empty($this->cart)) {
+            Notification::make()->title('Keranjang kosong')->danger()->send();
+            return;
+        }
+
+        // ✅ CEK STOK
+        foreach ($this->cart as $item) {
+            $needed = $item['qty'] * ($item['pcs_used'] ?? 1);
+            $available = StockService::getOutletStock(
+                $this->outlet_id,
+                $item['product_id']
+            );
+
+            if ($needed > $available) {
+                throw ValidationException::withMessages([
+                    'stock' => [
+                        "Stok {$item['name']} tidak cukup (butuh {$needed}, sisa {$available})"
+                    ],
+                ]);
+            }
+        }
+
+        $sale = Sale::create([
+            'store_id'      => $this->store_id,
+            'outlet_id'     => $this->outlet_id,
+            'customer_name' => $this->customer_name,
+            'payment_method'=> $this->payment_method,
+            'discount'      => (int) $this->discount,
+            'total'         => $this->total,
+            'sale_date'      => Carbon::parse($this->sale_date)->toDateString(),
+            'created_at'      => Carbon::parse($this->sale_date)->toDateString(),
+        ]);
+
+        $productIds = collect($this->cart)->pluck('product_id')->unique();
+        $products = Product::whereIn('id', $productIds)
+            ->select('id', 'cost_price')
+            ->get()
+            ->keyBy('id');
+
+        foreach ($this->cart as $item) {
+            // \Log::info('CART ITEM: ' . json_encode($item));
+            $pcsUsed = $item['pcs_used'] ?? 1;
+            // dd($this->cart);
+
+            $costUnit = (int) ($products[$item['product_id']]->cost_price ?? 0);
+
+            // HPP per qty jual
+            $realCostPrice = $costUnit * $pcsUsed;
+            
+            // Di sale item, qty bisa kamu simpan sebagai "pack" / "porsi"
+            SaleItem::create([
+                'sale_id'    => $sale->id,
+                'product_id' => $item['product_id'],
+                'product_variant_id'=> $item['variant_id'] ?? null,
+                'qty'        => $item['qty'], // qty jual (misal 1 box 4 pcs)
+                'price'      => $item['price'],
+                'subtotal'   => $item['subtotal'],
+                'cost_price' => $realCostPrice,
+                'created_at' => Carbon::parse($this->sale_date)->toDateString(),
+            ]);
+
+            // Stok fisik: keluar sesuai pcs_used
+            Stock::create([
+                'outlet_id'  => $this->outlet_id,
+                'product_id' => $item['product_id'],
+                'qty'        => $item['qty'] * $pcsUsed,
+                'unit_id'    => $item['unit_id'] ?? null,
+                'type'       => 'out',
+                'note'       => 'Penjualan POS #' . $sale->id,
+            ]);
+        }
+
+       $this->cart = [];
+            $this->customer_name = null;
+            $this->discount = 0;
+            $this->total = 0;
+
+            Notification::make()
+                ->title('Transaksi berhasil')
+                ->success()
+                ->send();
+
+            $this->lastSaleId = $sale->id;
+
+    }
+
+    public function printLastSale(): void
+    {
+        if (! $this->lastSaleId) {
+            Notification::make()
+                ->title("Tidak ada transaksi untuk dicetak.")
+                ->danger()
+                ->send();
+            return;
+        }
+
+        $sale = \App\Models\Sale::find($this->lastSaleId);
+
+        if (! $sale) {
+            Notification::make()
+                ->title("Transaksi tidak ditemukan.")
+                ->danger()
+                ->send();
+            return;
+        }
+
+        try {
+            \App\Services\ThermalPrintService::printSale($sale);
+
+            Notification::make()
+                ->title("Struk sedang dicetak...")
+                ->success()
+                ->send();
+        } catch (\Throwable $e) {
+            Notification::make()
+                ->title("Gagal mencetak")
+                ->body($e->getMessage())
+                ->danger()
+                ->send();
+        }
+    }
+
+    public function updateQty(int|string $key, int $change = 1): void
+    {
+        if (! isset($this->cart[$key])) {
+            return;
+        }
+
+        $newQty = $this->cart[$key]['qty'] + $change;
+        if ($newQty < 1) {
+            $newQty = 1;
+        }
+
+        $this->cart[$key]['qty'] = $newQty;
+        $this->cart[$key]['subtotal'] = $newQty * $this->cart[$key]['price'];
+
+        $this->calculateTotal();
+    }
+
+    public function updatedDiscount(): void
+    {
+        $this->calculateTotal();
+    }
+
+    public function updateQtyManual(int|string $key, $value): void
+    {
+        if (! isset($this->cart[$key])) {
+            return;
+        }
+
+        $qty = (int) $value;
+        if ($qty < 1) {
+            $qty = 1;
+        }
+
+        $this->cart[$key]['qty'] = $qty;
+        $this->cart[$key]['subtotal'] = $qty * $this->cart[$key]['price'];
+
+        $this->calculateTotal();
+    }
+}

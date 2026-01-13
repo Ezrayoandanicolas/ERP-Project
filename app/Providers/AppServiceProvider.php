@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\URL;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -19,6 +20,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // if (request()->getHost() !== 'localhost' && request()->getHost() !== '127.0.0.1') {
+        //     URL::forceScheme('https');
+        // }
+        $isLocal = in_array(request()->getHost(), ['localhost', '127.0.0.1']);
+
+        // Jika bukan localhost ATAU request ditandai HTTPS oleh proxy
+        if (! $isLocal || request()->header('X-Forwarded-Proto') === 'https') {
+            URL::forceScheme('https');
+            request()->server->set('HTTPS', 'on');
+        }
     }
 }

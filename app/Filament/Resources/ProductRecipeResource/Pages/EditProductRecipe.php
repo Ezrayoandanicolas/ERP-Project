@@ -21,4 +21,11 @@ class EditProductRecipe extends EditRecord
     {
         return $this->getResource()::getUrl('index');
     }
+
+    protected function afterSave(): void
+    {
+        $product = $this->record->product;
+        \App\Services\ProductCostingService::update($product);
+    }
+
 }

@@ -18,19 +18,23 @@ use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use App\Traits\FilamentLivewireRouteBinder;
 
 class AdminPanelProvider extends PanelProvider
 {
+    use FilamentLivewireRouteBinder;
+
     public function panel(Panel $panel): Panel
     {
         return $panel
             ->default()
-            ->id('admin')
-            ->path('admin')
+            ->id('superadmin')
+            ->path('superadmin')
             ->login()
-            ->registration()
-            ->passwordReset()
-            ->emailVerification()
+            ->sidebarFullyCollapsibleOnDesktop()
+            // ->registration()
+            // ->passwordReset()
+            // ->emailVerification()
             ->profile(EditProfile::class)
             ->colors([
                 'primary' => Color::Amber,
@@ -42,8 +46,12 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
-                Widgets\AccountWidget::class,
-                Widgets\FilamentInfoWidget::class,
+                Widgets\AccountWidget::class ,
+                \App\Filament\Widgets\SalesStats::class,
+                \App\Filament\Widgets\SalesChart::class,
+                \App\Filament\Widgets\TopProducts::class,
+                \App\Filament\Widgets\ExpenseStats::class,
+                // Widgets\FilamentInfoWidget::class,
             ])
             ->middleware([
                 EncryptCookies::class,
@@ -55,9 +63,30 @@ class AdminPanelProvider extends PanelProvider
                 SubstituteBindings::class,
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
+                'panel.role:superadmin,superadmin',
             ])
             ->authMiddleware([
                 Authenticate::class,
-            ]);
+            ])
+            ->authGuard('superadmin');
+
     }
+
+    public function register(): void
+    {
+        parent::register();
+
+        $this->app->afterResolving(\Filament\Panel::class, function (Panel $panel) {
+
+            // Cek apakah property id sudah diset
+            if (! property_exists($panel, 'id') || empty($panel->id)) {
+                return; // Skip panel yang belum final
+            }
+
+            if ($panel->id === 'superadmin') {
+                $this->registerLivewireRoutes($panel);
+            }
+        });
+    }
+
 }

@@ -40,6 +40,26 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+
+        'superadmin' => [
+            'driver' => 'session',
+            'provider' => 'users',
+        ],
+
+        'admin_store' => [
+            'driver' => 'session',
+            'provider' => 'users',
+        ],
+
+        'cashier' => [
+            'driver' => 'session',
+            'provider' => 'users',
+        ],
+
+        'member' => [
+            'driver' => 'session',
+            'provider' => 'users',
+        ],
     ],
 
     /*

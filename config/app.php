@@ -70,7 +70,7 @@ return [
     |
     */
 
-    'timezone' => 'UTC',
+    'timezone' => 'Asia/Jakarta',
 
     /*
     |--------------------------------------------------------------------------
@@ -168,7 +168,12 @@ return [
         // App\Providers\BroadcastServiceProvider::class,
         App\Providers\EventServiceProvider::class,
         App\Providers\Filament\AdminPanelProvider::class,
+        App\Providers\Filament\AdminStorePanelProvider::class,
+        App\Providers\Filament\CashierPanelProvider::class,
+        App\Providers\Filament\MemberPanelProvider::class,
         App\Providers\RouteServiceProvider::class,
+        // App\Providers\LivewireCustomRoutesProvider::class,
+        // App\Providers\LivewireRouteServiceProvider::class,
     ])->toArray(),
 
     /*

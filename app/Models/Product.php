@@ -11,7 +11,19 @@ class Product extends Model
         'category_id',
         'name',
         'type',
-        'price',
+        'cost_price',
+        'manual_cost',
+        'sell_price',
+        'yield_qty',
+        'yield_unit_id',
+        'image_url',
+    ];
+
+    protected $casts = [
+        'price' => 'float',
+        'cost_price' => 'float',
+        'manual_cost' => 'float',
+        'sell_price' => 'float',
     ];
 
     public function store()
@@ -22,12 +34,6 @@ class Product extends Model
     public function category()
     {
         return $this->belongsTo(Category::class);
-    }
-
-    // Resep (Liza’s Cookies)
-    public function ingredients()
-    {
-        return $this->belongsToMany(Ingredient::class, 'product_recipe');
     }
 
     public function stocks()
@@ -43,6 +49,16 @@ class Product extends Model
     public function recipes()
     {
         return $this->hasMany(ProductRecipe::class);
+    }
+
+    public function yieldUnit()
+    {
+        return $this->belongsTo(Unit::class, 'yield_unit_id');
+    }
+
+    public function variants()
+    {
+        return $this->hasMany(ProductVariant::class);
     }
 
 }

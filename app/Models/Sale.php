@@ -13,10 +13,13 @@ class Sale extends Model
         'total',
         'note',
         'discount',
+        'sale_date',
+        'created_at'
     ];
 
     protected $casts = [
         'total' => 'decimal:2',
+        'sale_date' => 'date',
     ];
 
     public function outlet()

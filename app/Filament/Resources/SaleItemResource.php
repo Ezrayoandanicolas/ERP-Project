@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Filament\Resources\SaleResource\RelationManagers;
+namespace App\Filament\Resources;
 
 use App\Models\SaleItem;
 use App\Models\Product;
@@ -10,7 +10,7 @@ use Filament\Tables;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Notifications\Notification;
 
-class ItemsRelationManager extends RelationManager
+class SaleItemResource extends RelationManager
 {
     protected static string $relationship = 'items';
     protected static ?string $title = 'Item Belanja';

@@ -21,33 +21,67 @@ class IngredientResource extends Resource
     {
         return $form->schema([
 
-            Forms\Components\Select::make('store_id')
-                ->relationship('store', 'name')
-                ->label('Toko Induk')
-                ->required()
-                ->searchable(),
+            Forms\Components\Section::make('Informasi Bahan')
+                ->schema([
+                    Forms\Components\Select::make('store_id')
+                        ->relationship('store', 'name')
+                        ->label('Toko Induk')
+                        ->required()
+                        ->preload()
+                        ->searchable(),
 
-            Forms\Components\TextInput::make('name')
-                ->label('Nama Bahan')
-                ->required(),
+                    Forms\Components\TextInput::make('name')
+                        ->label('Nama Bahan')
+                        ->required(),
+
+                    Forms\Components\Select::make('unit_id')
+                        ->relationship('unit', 'name')
+                        ->label('Satuan Bahan')
+                        ->required()
+                        ->preload()
+                        ->searchable()
+                        ->helperText('Pilih satuan bahan seperti gram, kg, pcs, lembar, siung, sachet, dll.'),
+                ])
+                ->columns(3),
+
         ]);
     }
 
     public static function table(Tables\Table $table): Tables\Table
     {
         return $table
-        ->columns([
-            Tables\Columns\TextColumn::make('store.name')
-                ->label('Toko')
-                ->sortable()
-                ->searchable(),
+            ->columns([
 
-            Tables\Columns\TextColumn::make('name')
-                ->label('Nama Bahan')
-                ->sortable()
-                ->searchable(),
-        ])
-        ->defaultSort('name');
+                Tables\Columns\TextColumn::make('store.name')
+                    ->label('Toko')
+                    ->sortable()
+                    ->searchable(),
+
+                Tables\Columns\TextColumn::make('name')
+                    ->label('Nama Bahan')
+                    ->sortable()
+                    ->searchable(),
+
+                Tables\Columns\TextColumn::make('unit.name')
+                    ->label('Satuan')
+                    ->sortable(),
+
+                Tables\Columns\TextColumn::make('total_stock')
+                    ->label('Total Stok')
+                    ->formatStateUsing(fn ($state, $record) => 
+                        number_format($state, 0) . ' ' . ($record->unit?->name ?? '')
+                    )
+                    ->sortable(),
+
+            ])
+            ->defaultSort('name')
+            ->filters([])
+            ->actions([
+                Tables\Actions\EditAction::make(),
+            ])
+            ->bulkActions([
+                Tables\Actions\DeleteBulkAction::make(),
+            ]);
     }
 
     public static function getPages(): array

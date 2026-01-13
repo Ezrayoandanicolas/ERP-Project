@@ -16,6 +16,11 @@ class Store extends Model
         'status' => 'boolean',
     ];
 
+    public function users(): HasMany
+    {
+        return $this->hasMany(User::class);
+    }
+
     public function outlets()
     {
         return $this->hasMany(Outlet::class);

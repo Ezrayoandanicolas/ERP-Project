@@ -18,17 +18,31 @@ class ProductRecipeResource extends Resource
 
     public static function form(Forms\Form $form): Forms\Form
     {
-        return $form->schema([
-
+        return $form
+        ->schema([
             Forms\Components\Select::make('product_id')
-                ->relationship('product', 'name')
-                ->label('Produk')
-                ->required(),
+            ->relationship('product', 'name')
+            ->required(),
 
-            Forms\Components\Select::make('ingredient_id')
-                ->relationship('ingredient', 'name')
-                ->label('Bahan')
-                ->required(),
+        Forms\Components\Select::make('ingredient_id')
+            ->relationship('ingredient', 'name')
+            ->required(),
+
+        Forms\Components\TextInput::make('qty')
+            ->numeric()
+            ->required(),
+
+        Forms\Components\Select::make('unit_id')
+            ->relationship('unit', 'name')
+            ->required(),
+
+        Forms\Components\TextInput::make('yield_qty')
+            ->numeric(),
+
+        Forms\Components\Select::make('yield_unit_id')
+            ->relationship('yieldUnit', 'name'),
+    
+        
         ]);
     }
 

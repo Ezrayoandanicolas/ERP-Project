@@ -13,10 +13,10 @@ class StoreResource extends Resource
 {
     protected static ?string $model = Store::class;
 
-    protected static ?string $navigationGroup = 'Master Data';
+    protected static ?string $navigationGroup = 'Stores';
     protected static ?string $navigationIcon = 'heroicon-o-building-storefront';
-    protected static ?string $label = 'Toko Induk';
-    protected static ?string $navigationLabel = 'Toko Induk';
+    protected static ?string $label = 'Stores';
+    protected static ?string $navigationLabel = 'Stores';
 
     public static function form(Forms\Form $form): Forms\Form
     {

@@ -7,12 +7,19 @@ use Illuminate\Database\Eloquent\Model;
 class Stock extends Model
 {
     protected $fillable = [
-        'outlet_id',
+        'outlet_id',     // OUTLET ASAL (Boleh null jika stok masuk dari luar)
         'product_id',
+        'unit_id',
         'qty',
-        'type',
+        'type',          // in / out / transfer
+        'target_outlet', // OUTLET TUJUAN (jika transfer)
+        'cost_price',
+        'price_total',
         'note',
-        'target_outlet',
+    ];
+
+    protected $casts = [
+        'qty' => 'float',
     ];
 
     public function outlet()
@@ -20,6 +27,7 @@ class Stock extends Model
         return $this->belongsTo(Outlet::class);
     }
 
+    // Jika pengiriman ke outlet lain
     public function target()
     {
         return $this->belongsTo(Outlet::class, 'target_outlet');
@@ -29,4 +37,10 @@ class Stock extends Model
     {
         return $this->belongsTo(Product::class);
     }
+
+    public function unit()
+    {
+        return $this->belongsTo(Unit::class);
+    }
+
 }

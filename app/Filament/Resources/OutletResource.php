@@ -12,7 +12,7 @@ class OutletResource extends Resource
 {
     protected static ?string $model = Outlet::class;
 
-    protected static ?string $navigationGroup = 'Master Data';
+    protected static ?string $navigationGroup = 'Stores';
     protected static ?string $navigationIcon = 'heroicon-o-building-office';
     protected static ?string $label = 'Outlet';
     protected static ?string $navigationLabel = 'Outlet';

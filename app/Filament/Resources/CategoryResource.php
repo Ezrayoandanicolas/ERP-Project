@@ -23,9 +23,10 @@ class CategoryResource extends Resource
             ->schema([
 
                 Forms\Components\Select::make('store_id')
-                    ->label('Toko Induk')
                     ->relationship('store', 'name')
+                    ->label('Toko Induk')
                     ->required()
+                    ->preload()
                     ->searchable(),
 
                 Forms\Components\TextInput::make('name')
@@ -46,6 +47,12 @@ class CategoryResource extends Resource
                 Tables\Columns\TextColumn::make('name')
                     ->label('Nama Kategori')
                     ->sortable(),
+
+                Tables\Columns\TextColumn::make('products_count')
+                    ->label('Jumlah Produk')
+                    ->counts('products')
+                    ->sortable(),
+
             ])
             ->searchable()
             ->defaultSort('store_id', 'asc');
@@ -62,7 +69,7 @@ class CategoryResource extends Resource
     {
         return [
             'index' => Pages\ListCategories::route('/'),
-            'create' => Pages\CreateCategory::route('/create'),
+            // 'create' => Pages\CreateCategory::route('/create'),
             'edit' => Pages\EditCategory::route('/{record}/edit'),
         ];
     }
