@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\URL;
+use Filament\Support\Facades\FilamentView;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -20,6 +21,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        FilamentView::registerRenderHook(
+            'head.end',
+            fn () => view('pwa.head')
+        );
         // if (request()->getHost() !== 'localhost' && request()->getHost() !== '127.0.0.1') {
         //     URL::forceScheme('https');
         // }

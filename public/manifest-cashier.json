@@ -1,0 +1,21 @@
+{
+  "name": "Hub E-Commerce - Cashier",
+  "short_name": "HEC",
+  "start_url": "/cashier/login",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#111827",
+  "icons": [
+    {
+      "src": "/icons/hec.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/hec.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

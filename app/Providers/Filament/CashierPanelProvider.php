@@ -17,9 +17,19 @@ use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use Filament\Support\Facades\FilamentView;
 
 class CashierPanelProvider extends PanelProvider
 {
+    public function boot(): void
+    {
+        FilamentView::registerRenderHook(
+            'panels::head.end',
+            fn () => view('pwa.head-cashier')
+        );
+    }
+
+
     public function panel(Panel $panel): Panel
     {
         return $panel

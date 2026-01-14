@@ -19,10 +19,19 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use App\Traits\FilamentLivewireRouteBinder;
+use Filament\Support\Facades\FilamentView;
 
 class AdminPanelProvider extends PanelProvider
 {
     use FilamentLivewireRouteBinder;
+
+    public function boot(): void
+    {
+        FilamentView::registerRenderHook(
+            'panels::head.end',
+            fn () => view('pwa.head-superadmin')
+        );
+    }
 
     public function panel(Panel $panel): Panel
     {
